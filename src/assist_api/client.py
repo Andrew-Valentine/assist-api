@@ -1,4 +1,6 @@
 from typing import Optional
+from cachetools import TTLCache
+from datetime import datetime
 
 import json
 import requests
@@ -30,6 +32,13 @@ class AssistAPI:
         self._session = requests.Session()
         request = self._session.get('https://assist.org')
         request.raise_for_status()
+
+        # caches
+        CACHE_TTL = 60 * 60 * 24
+
+        self._get_majors_cache                 = TTLCache(maxsize=100, ttl=CACHE_TTL, timer=datetime.now)
+        self._get_agreement_cache              = TTLCache(maxsize=100, ttl=CACHE_TTL, timer=datetime.now)
+        self._get_institution_agreements_cache = TTLCache(maxsize=100, ttl=CACHE_TTL, timer=datetime.now)
 
     def __enter__(self):
         return self
@@ -75,6 +84,12 @@ class AssistAPI:
     def get_institution_agreements(self, institution: Institution | str, academic_year: AcademicYear | int) -> InstitutionAgreements:
 
         institution_id = institution.id if isinstance(institution, Institution) else self.query_institution(institution).id
+        academic_year_id = academic_year.id if isinstance(academic_year, AcademicYear) else self.query_academic_year(academic_year).id
+
+        key = (institution_id, academic_year_id)
+        result = self._get_institution_agreements_cache.get(key)
+        if result is not None:
+            return result
             
         URL = f'https://assist.org/api/institutions/{institution_id}/agreements'
 
@@ -88,8 +103,6 @@ class AssistAPI:
 
         # for some reason there are 1 for 1 duplicates 
         used = set()
-
-        academic_year_id = academic_year.id if isinstance(academic_year, AcademicYear) else self.query_academic_year(academic_year).id
 
         sending_agreements = []
         receiving_agreements = []
@@ -107,7 +120,10 @@ class AssistAPI:
 
             used.add(institution_parent_id)
 
-        return InstitutionAgreements(tuple(sending_agreements), tuple(receiving_agreements))
+        result = InstitutionAgreements(tuple(sending_agreements), tuple(receiving_agreements))
+        self._get_institution_agreements_cache[key] = result
+
+        return result
 
     def _parse_course_group(self, data) -> Course | Series:
         course_conjunction = data['courseConjunction']
@@ -283,12 +299,22 @@ class AssistAPI:
                 
     def get_majors(self, sending_institution: Institution | str, receiving_institution: Institution | str, academic_year: AcademicYear | int) -> tuple[Major, ...]:
 
+        receiving_institution_id = receiving_institution.id if isinstance(receiving_institution, Institution) else self.query_institution(receiving_institution).id
+        sending_institution_id = sending_institution.id if isinstance(sending_institution, Institution) else self.query_institution(sending_institution).id
+        academic_year_id = academic_year.id if isinstance(academic_year, AcademicYear) else self.query_academic_year(academic_year).id
+
+        key = (receiving_institution_id, sending_institution_id, academic_year_id)
+        
+        result = self._get_majors_cache.get(key)
+        if result is not None:
+            return result
+
         URL = 'https://assist.org/api/agreements'
 
         params = {
-            'receivingInstitutionId': receiving_institution.id if isinstance(receiving_institution, Institution) else self.query_institution(receiving_institution).id,
-            'sendingInstitutionId': sending_institution.id if isinstance(sending_institution, Institution) else self.query_institution(sending_institution).id,
-            'academicYearId': academic_year.id if isinstance(academic_year, AcademicYear) else self.query_academic_year(academic_year).id,
+            'receivingInstitutionId': receiving_institution_id,
+            'sendingInstitutionId': sending_institution_id,
+            'academicYearId': academic_year_id,
             'categoryCode': 'major'
         }
 
@@ -304,10 +330,18 @@ class AssistAPI:
         reports, = require(data, 'reports')
 
         majors = [Major.from_json(major) for major in reports]
+        result =  tuple(sorted(majors, key=lambda major: major.name))
 
-        return tuple(sorted(majors, key=lambda major: major.name))
+        self._get_majors_cache[key] = result
+        return result
 
     def get_agreement(self, major: Major) -> Agreement:
+
+        key = major.key
+
+        result = self._get_agreement_cache.get(key)
+        if result is not None:
+            return result
 
         URL = 'https://assist.org/api/articulation/Agreements'
 
@@ -327,7 +361,10 @@ class AssistAPI:
         template_assets = json.loads(data['result']['templateAssets'])
         groups = self._parse_groups(template_assets, sending)
 
-        return Agreement(tuple(groups))
+        result = Agreement(tuple(groups))
+        self._get_agreement_cache[key] = result
+
+        return result
 
     def query_academic_year(self, fall_year: int) -> AcademicYear:
         result = next(
