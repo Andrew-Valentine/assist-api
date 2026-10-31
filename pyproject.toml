@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "assist-api"
+version = "0.0.4"
+authors = [
+  { name="Andrew Valentine", email="andrewjvjr@gmail.com" },
+]
+description = "Assist.org API wrapper"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+    "requests >= 2.31",
+]
+
+[project.urls]
+Homepage = "https://github.com/Andrew-Valentine/assist_api"
+Issues = "https://github.com/Andrew-Valentine/assist_api/issues"
