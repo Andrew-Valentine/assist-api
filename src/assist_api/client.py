@@ -36,6 +36,8 @@ class AssistAPI:
         # caches
         CACHE_TTL = timedelta(days=1)
 
+        self._get_academic_years_cache         = TTLCache(maxsize=1, ttl=CACHE_TTL, timer=datetime.now)
+        self._get_institutions_cache           = TTLCache(maxsize=1, ttl=CACHE_TTL, timer=datetime.now)
         self._get_majors_cache                 = TTLCache(maxsize=100, ttl=CACHE_TTL, timer=datetime.now)
         self._get_agreement_cache              = TTLCache(maxsize=100, ttl=CACHE_TTL, timer=datetime.now)
         self._get_institution_agreements_cache = TTLCache(maxsize=100, ttl=CACHE_TTL, timer=datetime.now)
@@ -57,6 +59,10 @@ class AssistAPI:
 
     def get_academic_years(self) -> tuple[AcademicYear, ...]:
 
+        result = self._get_academic_years_cache.get(None)
+        if result is not None:
+            return result
+        
         URL = 'https://assist.org/api/academicyears'
 
         request = self._session.get(URL, headers=self._headers)
@@ -66,9 +72,16 @@ class AssistAPI:
         academic_years = [AcademicYear.from_json(academic_year) for academic_year in data]
 
         # sort by id, ascending
-        return tuple(sorted(academic_years, key=lambda academic_year: academic_year.id))
+        result = tuple(sorted(academic_years, key=lambda academic_year: academic_year.id))
+        self._get_academic_years_cache[None] = result
+        
+        return result
 
     def get_institutions(self) -> tuple[Institution, ...]:
+
+        result = self._get_institutions_cache.get(None)
+        if result is not None:
+            return result
 
         URL = 'https://assist.org/api/institutions'
 
@@ -79,7 +92,10 @@ class AssistAPI:
         institutions = [Institution.from_json(institution) for institution in data]
 
         # sort by id, ascending
-        return tuple(sorted(institutions, key=lambda institution: institution.id))
+        result = tuple(sorted(institutions, key=lambda institution: institution.id))
+        self._get_institutions_cache[None] = result
+
+        return result
 
     def get_institution_agreements(self, institution: Institution | str, academic_year: AcademicYear | int) -> InstitutionAgreements:
 
