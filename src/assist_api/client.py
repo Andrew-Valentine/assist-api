@@ -1,6 +1,6 @@
 from typing import Optional
 from cachetools import TTLCache
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import json
 import requests
@@ -34,7 +34,7 @@ class AssistAPI:
         request.raise_for_status()
 
         # caches
-        CACHE_TTL = 60 * 60 * 24
+        CACHE_TTL = timedelta(days=1)
 
         self._get_majors_cache                 = TTLCache(maxsize=100, ttl=CACHE_TTL, timer=datetime.now)
         self._get_agreement_cache              = TTLCache(maxsize=100, ttl=CACHE_TTL, timer=datetime.now)
