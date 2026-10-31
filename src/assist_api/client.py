@@ -42,7 +42,7 @@ class AssistAPI:
         return {
             'Accept': 'application/json, text/plain, */*',
             'Content-Type': 'application/json',
-            'X-XSRF-TOKEN': self._session.cookies['X-XSRF-TOKEN'],
+            'X-XSRF-TOKEN': self._session.cookies['X-XSRF-TOKEN'] or '',
             'User-Agent': 'Mozilla/5.0'
         }
 
@@ -150,7 +150,7 @@ class AssistAPI:
 
         return tuple(course_groups)
 
-    def _parse_sending_articulation(self, sending_articulation) -> Course | Series:
+    def _parse_sending_articulation(self, sending_articulation) -> Optional[Course | Series]:
         course_group_conjunctions = sending_articulation['courseGroupConjunctions'] or []
         course_groups = self._parse_course_groups(sending_articulation['items'])
 
