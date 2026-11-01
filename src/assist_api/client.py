@@ -1,10 +1,16 @@
-from typing import Optional
-from cachetools import TTLCache
-from datetime import datetime, timedelta
-
 import json
-import requests
+from datetime import datetime, timedelta
+from typing import Optional
 
+import requests
+from cachetools import TTLCache
+
+from .exceptions import (
+    AcademicYearNotFound,
+    InstitutionNotFound,
+    MajorNotFound,
+    UnsupportedResponseError,
+)
 from .models import (
     AcademicYear,
     Agreement,
@@ -20,11 +26,6 @@ from .models import (
     require,
 )
 
-from .exceptions import (
-    AcademicYearNotFound, 
-    InstitutionNotFound, 
-    MajorNotFound,
-)
 
 class AssistAPI:
 
@@ -154,7 +155,7 @@ class AssistAPI:
                 case 'Course':
                     course_group.append(Course.from_json(subitem))
                 case _:
-                    raise NotImplementedError(f'unrecognized {subitem_type}')
+                    raise UnsupportedResponseError(f'unrecognized {subitem_type}')
 
         # final course group
         if len(course_group) > 1:
@@ -165,7 +166,7 @@ class AssistAPI:
         elif len(course_group) == 1:
             return course_group[0]
         else:
-            raise NotImplementedError('No courses')
+            raise UnsupportedResponseError('No courses')
 
     def _parse_course_groups(self, data) -> tuple[Course | Series, ...]:
         
@@ -178,7 +179,7 @@ class AssistAPI:
                 case 'CourseGroup':
                     course_groups.append(self._parse_course_group(course_group))
                 case _:
-                    raise NotImplementedError(f'unrecognized {course_group_type}')
+                    raise UnsupportedResponseError(f'unrecognized {course_group_type}')
 
         return tuple(course_groups)
 
@@ -193,7 +194,7 @@ class AssistAPI:
 
             conjunctions = {course_group_conjunction['groupConjunction'] for course_group_conjunction in course_group_conjunctions}
             if len(conjunctions) > 1:
-                raise NotImplementedError('More than one group conjunction, tell Andrew to implement this')
+                raise UnsupportedResponseError('More than one group conjunction, tell Andrew to implement this')
 
             # use first conjunction otherwise assume and when missing (courses appear stacked)
             return Series(
@@ -225,7 +226,7 @@ class AssistAPI:
                     # WTF is this? Found in SJDC -> Davis, Computer Science & Engineering B.S., 2025
                     pass
                 case _:
-                    raise NotImplementedError(f'unrecognized {sending_articulation_type}')
+                    raise UnsupportedResponseError(f'unrecognized {sending_articulation_type}')
         
         return sending
 
@@ -243,7 +244,7 @@ class AssistAPI:
             case 'CSUGE' | 'CALGETC' | 'GeneralEducation':
                 return None
             case _:
-                raise NotImplementedError(f'unrecognized {cell_type}')
+                raise UnsupportedResponseError(f'unrecognized {cell_type}')
 
         return Articulation(sending.get(cell_id), receiving)
 
@@ -269,7 +270,7 @@ class AssistAPI:
             case 'SectionHeader':
                 return None
             case _:
-                raise NotImplementedError(f'unrecognized {section_type}')
+                raise UnsupportedResponseError(f'unrecognized {section_type}')
 
     def _parse_group(self, asset, sending) -> Optional[Group]:
         asset_type = asset['type']
@@ -303,7 +304,7 @@ class AssistAPI:
             case 'GeneralText' | 'RequirementTitle' | 'GeneralTitle':
                 return None  
             case _:
-                raise NotImplementedError(f'unrecognized {asset_type}')
+                raise UnsupportedResponseError(f'unrecognized {asset_type}')
        
     def _parse_groups(self, template_assets, sending) -> list[Group]:
         groups = []
