@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Any, Optional
 
 from .exceptions import MissingKeyException
 
-def require(obj: dict, *keys) -> tuple[Any, ...]:
+
+def require(obj: dict[str, Any], *keys: str) -> tuple[Any, ...]:
     """ raise on missing key """
 
     values = []
@@ -15,7 +16,7 @@ def require(obj: dict, *keys) -> tuple[Any, ...]:
         values.append(obj[key])
     return tuple(values)
 
-def optional(obj: dict, *keys) -> tuple[Any, ...]:
+def optional(obj: dict[str, Any], *keys: str) -> tuple[Any, ...]:
     """ allow missing key """
 
     return tuple(obj.get(key) for key in keys)
@@ -28,7 +29,7 @@ class AcademicYear:
     raw: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     @classmethod
-    def from_json(cls, data):
+    def from_json(cls, data: dict[str, Any]) -> AcademicYear:
         id, fall_year = require(data, 'id', 'fallYear')
         return cls(id, fall_year, data)
 
@@ -40,7 +41,7 @@ class InstitutionName:
     raw: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
     
     @classmethod
-    def from_json(cls, data):
+    def from_json(cls, data: dict[str, Any]) -> InstitutionName:
         name, has_departments, hide_in_list = require(data, 'name', 'hasDepartments', 'hideInList')
         alternate_institution_id, from_year = optional(data, 'alternateInstitutionId', 'fromYear')
 
@@ -59,7 +60,7 @@ class TermTypeAcademicYear:
     raw: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
     
     @classmethod
-    def from_json(cls, data):
+    def from_json(cls, data: dict[str, Any]) -> TermTypeAcademicYear:
         term_type, from_year = require(data, 'termType', 'fromYear')
 
         return cls(
@@ -92,7 +93,7 @@ class Institution:
         if academic_year is not None:
             names = [name for name in self.names if not name.from_year or name.from_year <= academic_year]
         else:
-            names = self.names
+            names = list(self.names)
 
         if len(names) == 1:
             return names[0].name
@@ -109,7 +110,7 @@ class Institution:
             return None
 
     @classmethod
-    def  from_json(cls, data):
+    def  from_json(cls, data: dict[str, Any]) -> Institution:
         id, names, code, prefers_2016_legacy_report, is_community_college, category, term_type, begin_id, term_type_academic_years = require(
             data,
             'id',
@@ -136,7 +137,7 @@ class Institution:
             data
         )
 
-    def get_code(self):
+    def get_code(self) -> str:
         """ get the code of the institution """
 
         return self.code.strip()
@@ -160,7 +161,7 @@ class Major:
         return f'{self.name}'
 
     @classmethod
-    def from_json(cls, data):
+    def from_json(cls, data: dict[str, Any]) -> Major:
         key, label, owner_institution_id = require(data, 'key', 'label', 'ownerInstitutionId')
         return cls(key, label, owner_institution_id, data)
 
@@ -177,15 +178,15 @@ class Course:
     min_units: float
     max_units: float
 
-    position: int
+    position: Optional[int]
 
     raw: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'{self.prefix} {self.number}'
 
     @classmethod
-    def from_json(cls, data):
+    def from_json(cls, data: dict[str, Any]) -> Course:
         course_identifier_parent_id, course_title, course_number, prefix, prefix_parent_id, prefix_description, department_parent_id, department, begin, end, min_units, max_units, pathways = require(
             data,
             'courseIdentifierParentId',
@@ -232,11 +233,11 @@ class Series:
     conjunction: str
     children: tuple[Course | Series, ...]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'({f" {self.conjunction} ".join([child.__repr__() for child in self.children])})'
 
     @classmethod
-    def from_json(cls, data):
+    def from_json(cls, data: dict[str, Any]) -> Series:
         conjunction, name, courses, series_pathways = require(
             data,
             'conjunction',
@@ -254,7 +255,7 @@ class Requirement:
     name: str
 
     @classmethod
-    def from_json(cls, data):
+    def from_json(cls, data: dict[str, Any]) -> Requirement:
         name, = require(data, 'name')
 
         return cls(name)
@@ -284,22 +285,21 @@ class Agreement:
     groups: tuple[Group, ...]
 
     @property
-    def sections(self):
+    def sections(self) -> list[Section]:
         return [section for group in self.groups for section in group.sections]
 
     @property
-    def articulations(self):
+    def articulations(self) -> list[Articulation]:
         return [articulation for section in self.sections for articulation in section.articulations]
 
     @property
-    def articulated(self):
+    def articulated(self) -> list[Articulation]:
         return list(filter(lambda articulation: articulation.sending is not None, self.articulations))
 
     @property
-    def not_articulated(self):
+    def not_articulated(self) -> list[Articulation]:
         return list(filter(lambda articulation: articulation.sending is None, self.articulations))
 
     @property
     def complete(self) -> bool:
         return len(self.not_articulated) == 0
-                    
