@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, Any
 
@@ -98,7 +100,7 @@ class Institution:
         # sort by year, descending and remove old names (from_year == None)
         valid_names = sorted(
             (name for name in names if name.from_year is not None), 
-            key=lambda name: -name.from_year
+            key=lambda name: -(name.from_year or 0)
             )
 
         if len(valid_names) > 0:
@@ -228,7 +230,7 @@ class Course:
 class Series:
 
     conjunction: str
-    children: tuple[Course, ...]
+    children: tuple[Course | Series, ...]
 
     def __repr__(self):
         return f'({f" {self.conjunction} ".join([child.__repr__() for child in self.children])})'
